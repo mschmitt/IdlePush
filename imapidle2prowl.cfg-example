@@ -1,0 +1,13 @@
+# Title that will appear in prowl events
+prowl_app = IMAP
+# Prowl API key
+prowl_key = abcdef...
+
+# IMAP server data
+imap_host = 127.0.0.1
+imap_port = 143
+imap_user = user
+imap_pass = secret
+
+# This usually doesn't need to be changed.
+imap_box  = INBOX
