@@ -116,7 +116,7 @@ sub read_config {
 	open my $cf_in, "<$ARGV[0]" or die "Can't read $ARGV[0]: $!\n";
 	while(<$cf_in>){
 		chomp;                  # no newline
-		s/#.*//;                # no comments
+		s/^\s*#.*//;            # no comments
 		s/^\s+//;               # no leading white
 		s/\s+$//;               # no trailing white
 		next unless length;     # anything left?
