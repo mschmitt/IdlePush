@@ -2,11 +2,11 @@
 use strict;
 use diagnostics;
 use IO::Socket::INET;
+use IO::Socket::SSL;
 use POSIX qw(setsid);
 use Mail::IMAPClient;
 use WebService::Prowl;
 use MIME::EncWords qw(:all);
-
 
 # Config file syntax, see .cfg-example
 my $config = read_config();
@@ -17,6 +17,7 @@ my $imap_port = $config->{'imap_port'};
 my $imap_user = $config->{'imap_user'};
 my $imap_pass = $config->{'imap_pass'};
 my $imap_box  = $config->{'imap_box'};
+my $imap_ssl  = $config->{'imap_ssl'};
 
 # Open IMAP connection.
 my $returned = connect_imap();
@@ -94,12 +95,23 @@ sub connect_imap{
 	# as well as the raw socket for listening in on IDLE state.
 	# This subroutine returns them both.
 	my $return;
-	$return->{'socket'} = IO::Socket::INET->new(
-		PeerAddr => $imap_host,
-		PeerPort => $imap_port,
-		Timeout  => 30
-	) or die "Can't connect to $imap_host: $@";
-
+	# Instantiate Socket in plain or in SSL, depending on 
+	# configuration. 
+	if ($imap_ssl =~ /^(yes|true|1)$/i){
+		print "Starting SSL connection to $imap_host:$imap_port.\n";
+		$return->{'socket'} = IO::Socket::SSL->new(
+			PeerAddr => $imap_host,
+			PeerPort => $imap_port,
+			Timeout  => 30
+		) or die "Can't connect to $imap_host: $@";
+	}else{
+		print "Starting plaintext connection to $imap_host:$imap_port.\n";
+		$return->{'socket'} = IO::Socket::INET->new(
+			PeerAddr => $imap_host,
+			PeerPort => $imap_port,
+			Timeout  => 30
+		) or die "Can't connect to $imap_host: $@";
+	}
 	$return->{'imap'} = Mail::IMAPClient->new(
 		Socket     => $return->{'socket'},
 		User       => $imap_user,

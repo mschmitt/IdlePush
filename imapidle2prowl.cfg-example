@@ -8,6 +8,7 @@ imap_host = 127.0.0.1
 imap_port = 143
 imap_user = user
 imap_pass = secret
+imap_ssl  = no
 
 # This usually doesn't need to be changed.
 imap_box  = INBOX
