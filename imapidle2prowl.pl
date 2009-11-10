@@ -60,7 +60,7 @@ while(1){
 			# We only care about new EXISTS states.
 			if ($in =~ /\b(\d+) EXISTS\b/){
 				my $exists_id = $1;
-				print "Received $1 EXISTS from IMAP.\n";
+				print "Received $exists_id EXISTS from IMAP.\n";
 				# Bail out of the IDLE session and pick up the new message.
 				# This was previously implemented using another thread,
 				# but was unified into a single thread, as Threads and alarm()
@@ -78,7 +78,8 @@ while(1){
 					description => "From $from, Subject: $subject",
 					priority    => -1
 				);
-				# Go back to IDLE state.
+				# Go back to IDLE state, reset alarm
+				alarm($interval);
 				$session = $imap->idle or die "Couldn't idle: $@\n";
 			}
 		}

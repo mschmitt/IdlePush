@@ -32,6 +32,10 @@ Bugs/Limitations
   Regular timeouts are 25 minutes, which decreases the probability
   of this actually happening.
 
+- SSL works by replacing IO::Socket::SSL instead of IO::Socket::INET, 
+  but needs to be made configurable. Also need to look into certificate
+  validation.
+
 - Released early, due to popular demand. ;-)
 
 Copyright and license
