@@ -110,7 +110,7 @@ while(1){
 				push @prowl_cmd, "-application=$prowl_app";
 				push @prowl_cmd, "-event=New Mail";
 				push @prowl_cmd, "-notification=From $from, Subject: $subject";
-				push @prowl_cmd, "-priority=2";
+				push @prowl_cmd, "-priority=0";
 				system(@prowl_cmd);
 				# Exit loop and eval from here; let the main loop restart IDLE.
 				die "Done. Continue outside eval.";
