@@ -5,8 +5,8 @@ use IO::Socket::INET;
 use IO::Socket::SSL;
 use POSIX qw(setsid);
 use Mail::IMAPClient;
-use WebService::Prowl;
 use MIME::EncWords qw(:all);
+use FindBin qw($Bin);
 
 # Config file syntax, see .cfg-example
 my $config = read_config();
@@ -24,6 +24,12 @@ my $returned = connect_imap();
 my $imap   = $returned->{'imap'};
 my $socket = $returned->{'socket'};
 $imap->select($imap_box) or die "Could not select folder $imap_box: $@\n";;
+
+# Command line version of prowl.pl
+my $prowl = "$Bin/libexec/prowl.pl";
+unless (-x $prowl){
+	die "$prowl not found or not executable.\n";
+}
 
 # Fork unless told otherwise 
 # set environment NOFORK=1 to run in foreground
@@ -72,13 +78,15 @@ while(1){
 				my $subject = decode_mimewords($header->{'Subject'}->[0], Charset => 'utf-8');
 				my $from    = decode_mimewords($header->{'From'}->[0],    Charset => 'utf-8');
 				print "New message from $from, Subject: $subject \n";
-				my $ws = WebService::Prowl->new(apikey => $prowl_key);
-				$ws->add(
-					application => $prowl_app,
-					event       => 'New mail',
-					description => "From $from, Subject: $subject",
-					priority    => -1
-				);
+				# Build the command line for and execute prowl.pl
+				my @prowl_cmd;
+				push @prowl_cmd, $prowl;
+				push @prowl_cmd, "-apikey=$prowl_key";
+				push @prowl_cmd, "-application=$prowl_app";
+				push @prowl_cmd, "-event=New Mail";
+				push @prowl_cmd, "-notification=From $from, Subject: $subject";
+				push @prowl_cmd, "-priority=2";
+				system(@prowl_cmd);
 				# Go back to IDLE state, reset alarm
 				alarm($interval);
 				$session = $imap->idle;
