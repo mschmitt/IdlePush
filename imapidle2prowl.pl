@@ -5,8 +5,8 @@ use IO::Socket::INET;
 use IO::Socket::SSL;
 use POSIX qw(setsid);
 use Mail::IMAPClient;
-use WebService::Prowl;
 use MIME::EncWords qw(:all);
+use FindBin qw($Bin);
 
 # Config file syntax, see .cfg-example
 my $config = read_config();
@@ -19,11 +19,30 @@ my $imap_pass = $config->{'imap_pass'};
 my $imap_box  = $config->{'imap_box'};
 my $imap_ssl  = $config->{'imap_ssl'};
 
+# Command line version of prowl.pl
+my $prowl = "$Bin/libexec/prowl.pl";
+unless (-x $prowl){
+	die "$prowl not found or not executable.\n";
+}
+
 # Open IMAP connection.
 my $returned = connect_imap();
 my $imap   = $returned->{'imap'};
 my $socket = $returned->{'socket'};
-$imap->select($imap_box) or die "Could not select folder $imap_box: $@\n";;
+$imap->select($imap_box) or die "Could not select folder $imap_box: $@\n";
+
+# Peek means, don't change any message flags.
+$imap->Peek(1);
+
+# Do not use Uids for transactions, so we can work with the 
+# sequence ID from IDLE EXISTS
+$imap->Uid(0);
+
+# Number of messages currently in mailbox
+# Needed to keep up with IMAP servers that overflow
+# us with EXPUNGE statuses during IDLE. :-)
+my $gauge = $imap->message_count;
+print "$gauge messages in mailbox.\n";
 
 # Fork unless told otherwise 
 # set environment NOFORK=1 to run in foreground
@@ -40,54 +59,73 @@ unless ($ENV{'NOFORK'}){
 
 # The main loop revolves around IDLE-recycling as mandated by RFC 2177
 while(1){
-	$imap->noop or $imap->reconnect() or die "IMAP reconnect failed: $@\n";;
-	# Peek means, don't change any message flags.
-	$imap->Peek(1);
-	# Do not use Uids for transactions, so we can work with the sequence 
-	# ID from IDLE EXISTS
-	$imap->Uid(0);
+	print "Start main loop.\n";
+	# See if we are connected.
+	unless ($imap->noop){
+		$imap->disconnect;
+		print "Reconnecting to IMAP.\n";
+		my $returned = connect_imap();
+		$imap   = $returned->{'imap'};
+		$socket = $returned->{'socket'};
+		$imap->select($imap_box) or die "Could not select folder $imap_box: $@\n";
+	}
+	# Synchronize message gauge from message count
+	$gauge = $imap->message_count;
 	# RFC2177 demands re-cycling the connection once in a while.
-	my $interval = 25*60; # 25 minutes
+	my $interval = 60*25; # 25 minutes
 	# Send session into idle state
 	my $session = $imap->idle or die "Couldn't idle: $@\n";
 	# Perl Cookbook 16.21: "Timing Out an Operation"
 	$SIG{'ALRM'} = sub { die "__TIMEOUT__" };
-	# Race condition here: The alarm for IDLE-recycling may strike after
-	# reception of EXISTS and before PROWLing the notification. No harm done
-	# then, only a missed notification. Could use a fix, though.
 	eval {
 		alarm($interval);
+		print "Start eval. Alarm set. Gauge at $gauge.\n";
 		while(my $in = <$socket>){
-			# We only care about new EXISTS states.
-			if ($in =~ /\b(\d+) EXISTS\b/){
+			print "$in\n";
+			if ($in =~ /\b(\d+) EXPUNGE\b/i){
+				print "Expunge event.\n"; 
+				# EXPUNGE means that one message has been deleted.
+				# Lower gauge by 1. Can't count mailbox contents here,
+				# as session is in IDLE state.
+				$gauge--;
+				print "Expunge $1, now at $gauge messages.\n";
+			}elsif (($in =~ /\b(\d+) EXISTS\b/i) and ($1 > $gauge)){
+				# EXISTS means that one message has been created.
+				# Only act if the reported ID is higher than our gauge.
+				# Cancel alarm so we don't get killed while PROWLing.
+				alarm(0);
 				my $exists_id = $1;
 				print "Received $exists_id EXISTS from IMAP.\n";
 				# Bail out of the IDLE session and pick up the new message.
-				# This was previously implemented using another thread,
-				# but was unified into a single thread, as Threads and alarm()
-				# really don't like each other.
 				$imap->done($session);
 				# Retrieve and mangle new message headers.
 				my $header  = $imap->parse_headers($exists_id, 'Subject', 'From');
 				my $subject = decode_mimewords($header->{'Subject'}->[0], Charset => 'utf-8');
 				my $from    = decode_mimewords($header->{'From'}->[0],    Charset => 'utf-8');
 				print "New message from $from, Subject: $subject \n";
-				my $ws = WebService::Prowl->new(apikey => $prowl_key);
-				$ws->add(
-					application => $prowl_app,
-					event       => 'New mail',
-					description => "From $from, Subject: $subject",
-					priority    => -1
-				);
-				# Go back to IDLE state, reset alarm
-				alarm($interval);
-				$session = $imap->idle;
+				# Build the command line for and execute prowl.pl
+				my @prowl_cmd;
+				push @prowl_cmd, $prowl;
+				push @prowl_cmd, "-apikey=$prowl_key";
+				push @prowl_cmd, "-application=$prowl_app";
+				push @prowl_cmd, "-event=New Mail";
+				push @prowl_cmd, "-notification=From $from, Subject: $subject";
+				push @prowl_cmd, "-priority=2";
+				system(@prowl_cmd);
+				# Exit loop and eval from here; let the main loop restart IDLE.
+				die "Done. Continue outside eval.";
+				# I don't seem to get the hang of eval. "last" doesn't work here.
+				# Please, if you can, submit something else. ;-)
 			}
 		}
 	};
 	# Executed when the timeout for re-cycling the IDLE session has struck.
-	print "Recycling IDLE session.\n";
-	$imap->done($session);
+	if ($@ =~ "__TIMEOUT__"){
+		print "Recycling IDLE session after $interval seconds.\n";
+		$imap->done($session);
+	}else{
+		print "Done 1 message.\n";
+	}
 }
 
 sub connect_imap{
