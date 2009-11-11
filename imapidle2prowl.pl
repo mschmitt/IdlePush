@@ -68,7 +68,7 @@ while(1){
 				# really don't like each other.
 				$imap->done($session);
 				# Retrieve and mangle new message headers.
-				my $header  = $imap->parse_headers($exists_id, 'Subject', 'From') or die "Could not parse_headers: $@\n";
+				my $header  = $imap->parse_headers($exists_id, 'Subject', 'From');
 				my $subject = decode_mimewords($header->{'Subject'}->[0], Charset => 'utf-8');
 				my $from    = decode_mimewords($header->{'From'}->[0],    Charset => 'utf-8');
 				print "New message from $from, Subject: $subject \n";
@@ -81,7 +81,7 @@ while(1){
 				);
 				# Go back to IDLE state, reset alarm
 				alarm($interval);
-				$session = $imap->idle or die "Couldn't idle: $@\n";
+				$session = $imap->idle;
 			}
 		}
 	};
