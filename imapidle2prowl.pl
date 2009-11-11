@@ -68,6 +68,8 @@ while(1){
 		$imap   = $returned->{'imap'};
 		$socket = $returned->{'socket'};
 		$imap->select($imap_box) or die "Could not select folder $imap_box: $@\n";
+		$imap->Peek(1);
+		$imap->Uid(0);
 	}
 	# Synchronize message gauge from message count
 	$gauge = $imap->message_count;
