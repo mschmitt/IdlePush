@@ -1,3 +1,5 @@
+***** This is under heavy development. Unstable and lots of debug output. ******
+
 GhettoPush
 ==========
 
@@ -16,8 +18,6 @@ Requires
 
   - Mail::IMAPClient (for talking to the IMAP server)
 
-  - WebService::Prowl (for sending Prowl notifications)
-
   - MIME::EncWords (for cleaning up MIME-encoded strings from the e-mail)
 
 Bugs/Limitations
@@ -26,15 +26,7 @@ Bugs/Limitations
 - It would be truly nice to have a logfile when backgrounded. Or any
   interface to the backgrounded program.
 
-- The current implementation may rarely miss new messages during
-  re-cycling of the IDLE session. I have experienced this while 
-  aggressively testing the re-cycle code with 1-second timeouts.
-  Regular timeouts are 25 minutes, which decreases the probability
-  of this actually happening.
-
-- SSL works by replacing IO::Socket::SSL instead of IO::Socket::INET, 
-  but needs to be made configurable. Also need to look into certificate
-  validation.
+- SSL works in oppurtunistic mode. No certificate validation so far.
 
 - Released early, due to popular demand. ;-)
 
