@@ -21,7 +21,7 @@ Requires
 Bugs/Limitations
 ----------------
 
-- SSL works in oppurtunistic mode. No certificate validation so far.
+- SSL works in opportunistic mode. No certificate validation so far.
 
 Copyright and license
 ---------------------

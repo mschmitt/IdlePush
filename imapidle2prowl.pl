@@ -64,7 +64,7 @@ if ($pidfile){
 	print $lock_fh "$$\n";
 	select($lock_fh);
 	$| = 1;
-	select(STDIN);
+	select(STDOUT);
 	dolog('debug', "PID $$ written to pidfile: $pidfile");
 }
 
