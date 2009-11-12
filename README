@@ -1,5 +1,3 @@
-***** This is under heavy development. Unstable and lots of debug output. ******
-
 GhettoPush
 ==========
 
@@ -23,12 +21,7 @@ Requires
 Bugs/Limitations
 ----------------
 
-- It would be truly nice to have a logfile when backgrounded. Or any
-  interface to the backgrounded program.
-
 - SSL works in oppurtunistic mode. No certificate validation so far.
-
-- Released early, due to popular demand. ;-)
 
 Copyright and license
 ---------------------

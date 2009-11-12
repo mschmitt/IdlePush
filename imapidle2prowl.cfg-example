@@ -1,5 +1,6 @@
 # Title that will appear in prowl events
 prowl_app = IMAP
+
 # Prowl API key
 prowl_key = abcdef...
 
@@ -12,3 +13,7 @@ imap_ssl  = no
 
 # This usually doesn't need to be changed.
 imap_box  = INBOX
+
+# Optionally, specify the name of a log and PID file.
+#logfile   = ~/imapidle2prowl.log
+#pidfile   = ~/imapidle2prowl.pid

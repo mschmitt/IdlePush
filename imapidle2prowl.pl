@@ -3,7 +3,8 @@ use strict;
 use diagnostics;
 use IO::Socket::INET;
 use IO::Socket::SSL;
-use POSIX qw(setsid);
+use POSIX qw(setsid strftime);
+use Fcntl qw(:flock);
 use Mail::IMAPClient;
 use MIME::EncWords qw(:all);
 use FindBin qw($Bin);
@@ -18,11 +19,31 @@ my $imap_user = $config->{'imap_user'};
 my $imap_pass = $config->{'imap_pass'};
 my $imap_box  = $config->{'imap_box'};
 my $imap_ssl  = $config->{'imap_ssl'};
+my $logfile;
+if ($config->{'logfile'}){
+	$logfile = glob($config->{'logfile'});
+}
+my $pidfile;
+if ($config->{'pidfile'}){
+	$pidfile = glob($config->{'pidfile'});
+}
 
 # Command line version of prowl.pl
 my $prowl = "$Bin/libexec/prowl.pl";
 unless (-x $prowl){
 	die "$prowl not found or not executable.\n";
+}
+
+# Open Pidfile and lock it, if requested.
+my $lock_fh;
+if ($pidfile){
+	open $lock_fh, "+>$pidfile" or die "Could not create $pidfile: $!\n";
+	if (flock($lock_fh,LOCK_EX|LOCK_NB)){
+		dolog('debug', "Lockfile created: $pidfile");
+	}else{
+		close $lock_fh;
+		die "Abort: Another instance seems to be running!\n";
+	}
 }
 
 # Fork unless told otherwise 
@@ -36,6 +57,15 @@ unless ($ENV{'NOFORK'}){
         open STDOUT, ">/dev/null" or die "STDOUT >/dev/null: $!\n";
         open STDERR, ">/dev/null" or die "STDERR >/dev/null: $!\n";
         setsid();
+}
+
+# Write PID to pidfile, if requested.
+if ($pidfile){
+	print $lock_fh "$$\n";
+	select($lock_fh);
+	$| = 1;
+	select(STDIN);
+	dolog('debug', "PID $$ written to pidfile: $pidfile");
 }
 
 # Holds connections throughout multiple cycles of the main loop.
@@ -187,6 +217,13 @@ sub dolog {
 	my $lvl = shift;
 	my $msg = shift;
 	chomp $msg;
+	if ($lvl eq "debug"){
+		return unless ($ENV{'DEBUG'});
+	}
 	print STDERR "[$lvl] $msg\n";
+	if ($logfile){
+		open my $log_out, ">>$logfile" or die "Can't write to $logfile: $!\n";
+		print $log_out strftime("%Y-%m-%d %H:%M:%S [$lvl] $msg\n",localtime(time));
+		close $log_out;
+	}
 }
-
