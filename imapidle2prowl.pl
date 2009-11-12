@@ -30,7 +30,7 @@ unless (-x $prowl){
 # e.g.: NOFORK=1 ./imapidle2prowl.pl config.cfg
 unless ($ENV{'NOFORK'}){
         fork && exit;
-	print "Backgrounding. PID is $$.\n";
+	dolog('info', "Backgrounding. PID is $$.");
         chdir ('/');
         open STDIN,  "/dev/null"  or die "STDIN </dev/null: $!\n";
         open STDOUT, ">/dev/null" or die "STDOUT >/dev/null: $!\n";
@@ -44,11 +44,11 @@ my $socket;
 
 # The main loop revolves around IDLE-recycling as mandated by RFC 2177
 while(1){
-	print "Start main loop.\n";
+	dolog('debug', 'Start main loop.');
 	# See if we are connected.
 	unless ($imap and $imap->noop){
 		$imap->disconnect if ($imap);
-		print "Connecting to IMAP.\n";
+		dolog('info', 'Connecting to IMAP.');
 		# Open IMAP connection.
 		my $returned = connect_imap();
 		$imap   = $returned->{'imap'};
@@ -70,32 +70,32 @@ while(1){
 	$SIG{'ALRM'} = sub { die "__TIMEOUT__" };
 	eval {
 		alarm($interval);
-		print "Start eval. Alarm set. Gauge at $gauge.\n";
+		dolog('debug', "Start eval. Alarm set. Gauge at $gauge.");
 		while(my $in = <$socket>){
-			print "$in\n";
+			dolog('debug', "read from socket: $in");
 			if ($in =~ /\b(\d+) EXPUNGE\b/i){
-				print "Expunge event.\n"; 
+				dolog('debug', 'Expunge event from socket.'); 
 				# EXPUNGE means that one message has been deleted.
 				# Lower gauge by 1. Can't count mailbox contents here,
 				# as session is in IDLE state.
 				$gauge--;
-				print "Expunge $1, now at $gauge messages.\n";
+				dolog('debug', "Expunge $1, now at $gauge messages.");
 			}elsif (($in =~ /\b(\d+) EXISTS\b/i) and ($1 > $gauge)){
 				# EXISTS means that one message has been created.
 				# Only act if the reported ID is higher than our gauge.
 				# Cancel alarm so we don't get killed while PROWLing.
 				alarm(0);
 				my $exists_id = $1;
-				print "Received $exists_id EXISTS from IMAP.\n";
+				dolog('debug', "Received $exists_id EXISTS from IMAP.");
 				# Bail out of the IDLE session and pick up the new message.
 				$imap->done($session);
 				# Retrieve and mangle new message headers.
 				my $header  = $imap->parse_headers($exists_id, 'Subject', 'From');
 				my $subject = decode_mimewords($header->{'Subject'}->[0], Charset => 'utf-8');
 				my $from    = decode_mimewords($header->{'From'}->[0],    Charset => 'utf-8');
-				print "New message from $from, Subject: $subject \n";
+				dolog('info', "New message from $from, Subject: $subject");
 				unless ($header and $subject and $from){
-					print "Empty message details. Skipping prowl, killing IMAP session.\n";
+					dolog('warn', 'Empty message details. Skipping prowl, killing IMAP session.');
 					$imap->disconnect;
 					die "__PROWL_SKIP_EMPTY__";
 				}
@@ -107,7 +107,7 @@ while(1){
 				push @prowl_cmd, "-event=New Mail";
 				push @prowl_cmd, "-notification=From $from, Subject: $subject";
 				push @prowl_cmd, "-priority=0";
-				system(@prowl_cmd);
+				system(@prowl_cmd) or die "__PROW_FAIL__";
 				# Exit loop and eval from here; let the main loop restart IDLE.
 				die "__DONE__";
 				# I don't seem to get the hang of eval. "last" doesn't work here.
@@ -117,14 +117,16 @@ while(1){
 	};
 	# Executed when the timeout for re-cycling the IDLE session has struck.
 	if ($@ =~ /__TIMEOUT__/){
-		print "Recycling IDLE session after $interval seconds.\n";
+		dolog('info', "Recycling IDLE session after $interval seconds.");
 		$imap->done($session);
 	}elsif($@ =~ /__DONE__/){
-		print "Done, notification sent.\n";
+		dolog('info', 'Done, notification sent.');
 	}elsif($@ =~ /__PROWL_SKIP_EMPTY__/){
-		print "Skipped bogus message details.\n";
+		dolog('warn', 'Skipped bogus message details.');
+	}elsif($@ =~ /__PROWL_FAIL__/){
+		dolog('warn', 'Call to prowl.pl failed. Better luck next time?');
 	}else{
-		print "Disconnected?\n";
+		dolog('warn', 'Socket read loop ended by itself. Disconnected from server?');
 	}
 }
 
@@ -136,14 +138,14 @@ sub connect_imap{
 	# Instantiate Socket in plain or in SSL, depending on 
 	# configuration. 
 	if ($imap_ssl =~ /^(yes|true|1)$/i){
-		print "Starting SSL connection to $imap_host:$imap_port.\n";
+		dolog('info', "Starting SSL connection to $imap_host:$imap_port.");
 		$return->{'socket'} = IO::Socket::SSL->new(
 			PeerAddr => $imap_host,
 			PeerPort => $imap_port,
 			Timeout  => 30
 		) or die "Can't connect to $imap_host: $@";
 	}else{
-		print "Starting plaintext connection to $imap_host:$imap_port.\n";
+		dolog('info', "Starting plaintext connection to $imap_host:$imap_port.");
 		$return->{'socket'} = IO::Socket::INET->new(
 			PeerAddr => $imap_host,
 			PeerPort => $imap_port,
@@ -176,3 +178,11 @@ sub read_config {
 	close $cf_in;
 	return \%cfdata;
 }
+
+sub dolog {
+	my $lvl = shift;
+	my $msg = shift;
+	chomp $msg;
+	print STDERR "[$lvl] $msg\n";
+}
+
