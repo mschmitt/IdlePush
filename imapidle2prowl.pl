@@ -63,7 +63,7 @@ while(1){
 	# Synchronize message gauge from message count
 	my $gauge = $imap->message_count;
 	# RFC2177 demands re-cycling the connection once in a while.
-	my $interval = 60*25; # 25 minutes
+	my $interval = 25; # 25 minutes
 	# Send session into idle state
 	my $session = $imap->idle or die "Couldn't idle: $@\n";
 	# Perl Cookbook 16.21: "Timing Out an Operation"
@@ -94,6 +94,11 @@ while(1){
 				my $subject = decode_mimewords($header->{'Subject'}->[0], Charset => 'utf-8');
 				my $from    = decode_mimewords($header->{'From'}->[0],    Charset => 'utf-8');
 				print "New message from $from, Subject: $subject \n";
+				unless ($header and $subject and $from){
+					print "Empty message details. Skipping prowl, killing IMAP session.\n";
+					$imap->disconnect;
+					die "__PROWL_SKIP_EMPTY__";
+				}
 				# Build the command line for and execute prowl.pl
 				my @prowl_cmd;
 				push @prowl_cmd, $prowl;
@@ -104,18 +109,22 @@ while(1){
 				push @prowl_cmd, "-priority=0";
 				system(@prowl_cmd);
 				# Exit loop and eval from here; let the main loop restart IDLE.
-				die "Done. Continue outside eval.";
+				die "__DONE__";
 				# I don't seem to get the hang of eval. "last" doesn't work here.
 				# Please, if you can, submit something else. ;-)
 			}
 		}
 	};
 	# Executed when the timeout for re-cycling the IDLE session has struck.
-	if ($@ =~ "__TIMEOUT__"){
+	if ($@ =~ /__TIMEOUT__/){
 		print "Recycling IDLE session after $interval seconds.\n";
 		$imap->done($session);
+	}elsif($@ =~ /__DONE__/){
+		print "Done, notification sent.\n";
+	}elsif($@ =~ /__PROWL_SKIP_EMPTY__/){
+		print "Skipped bogus message details.\n";
 	}else{
-		print "Done 1 message.\n";
+		print "Disconnected?\n";
 	}
 }
 
