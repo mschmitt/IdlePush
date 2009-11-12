@@ -107,7 +107,11 @@ while(1){
 				push @prowl_cmd, "-event=New Mail";
 				push @prowl_cmd, "-notification=From $from, Subject: $subject";
 				push @prowl_cmd, "-priority=0";
-				system(@prowl_cmd) or die "__PROW_FAIL__";
+				system(@prowl_cmd);
+				dolog('debug', (join ' ', @prowl_cmd));
+				my $rc = $?>>8;
+				dolog('debug', "Call to prowl.pl returned exitcode: $rc");
+				die "__PROWL_FAIL__" unless (0 == $rc);
 				# Exit loop and eval from here; let the main loop restart IDLE.
 				die "__DONE__";
 				# I don't seem to get the hang of eval. "last" doesn't work here.
