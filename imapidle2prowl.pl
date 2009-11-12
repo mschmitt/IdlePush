@@ -63,7 +63,7 @@ while(1){
 	# Synchronize message gauge from message count
 	my $gauge = $imap->message_count;
 	# RFC2177 demands re-cycling the connection once in a while.
-	my $interval = 25; # 25 minutes
+	my $interval = 25*60; # 25 minutes
 	# Send session into idle state
 	my $session = $imap->idle or die "Couldn't idle: $@\n";
 	# Perl Cookbook 16.21: "Timing Out an Operation"
