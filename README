@@ -14,7 +14,7 @@ Requires
 
 - The non-standard Perl modules:
 
-  - Mail::IMAPClient (for talking to the IMAP server)
+  - Mail::IMAPClient (for talking to the IMAP server) >= Version 3.18.
 
   - MIME::EncWords (for cleaning up MIME-encoded strings from the e-mail)
 

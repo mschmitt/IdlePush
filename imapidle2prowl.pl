@@ -5,7 +5,7 @@ use IO::Socket::INET;
 use IO::Socket::SSL;
 use POSIX qw(setsid strftime);
 use Fcntl qw(:flock);
-use Mail::IMAPClient;
+use Mail::IMAPClient 3.18;
 use MIME::EncWords qw(:all);
 use FindBin qw($Bin);
 
