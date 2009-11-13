@@ -21,7 +21,20 @@ Requires
 Bugs/Limitations
 ----------------
 
-- SSL works in opportunistic mode. No certificate validation so far.
+- No limitations known.
+
+- Please report bugs directly to the author.
+
+About SSL
+---------
+
+SSL validation requires a directory that contains any number of certificates
+from trusted certification authorities. Change to that directory, run
+c_rehash there (included with OpenSSL) and specify the name of that 
+directory as the ssl_CApath option. 
+
+On Debian systems, the default /etc/ssl/certs is a great starting point. You 
+don't even need to issue c_rehash there.
 
 Copyright and license
 ---------------------

@@ -14,6 +14,11 @@ imap_ssl  = no
 # This usually doesn't need to be changed.
 imap_box  = INBOX
 
+# Optionally, activate SSL validation for the server certificate.
+# Remember to enter your actual CApath here.
+ssl_verify = no
+ssl_CApath = /etc/ssl/certs
+
 # Optionally, specify the name of a log and PID file.
 #logfile   = ~/imapidle2prowl.log
 #pidfile   = ~/imapidle2prowl.pid

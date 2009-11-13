@@ -27,6 +27,14 @@ my $pidfile;
 if ($config->{'pidfile'}){
 	$pidfile = glob($config->{'pidfile'});
 }
+my $ssl_verify;
+if ($config->{'ssl_verify'}){
+	$ssl_verify = $config->{'ssl_verify'};
+}
+my $ssl_CApath;
+if ($config->{'ssl_CApath'}){
+	$ssl_CApath = $config->{'ssl_CApath'};
+}
 
 # Command line version of prowl.pl
 my $prowl = "$Bin/libexec/prowl.pl";
@@ -171,13 +179,26 @@ sub connect_imap{
 	my $return;
 	# Instantiate Socket in plain or in SSL, depending on 
 	# configuration. 
-	if ($imap_ssl =~ /^(yes|true|1)$/i){
+	if ($imap_ssl and ($imap_ssl =~ /^(yes|true|1)$/i)){
 		dolog('info', "Starting SSL connection to $imap_host:$imap_port.");
+		my %ssl_verify_opts;
+		if ($ssl_verify and ($ssl_verify =~ /^(yes|true|1)$/i)){
+			%ssl_verify_opts = ( 
+				SSL_verify_mode => 1,
+				SSL_ca_path     => $ssl_CApath
+			);
+		}
+			
 		$return->{'socket'} = IO::Socket::SSL->new(
 			PeerAddr => $imap_host,
 			PeerPort => $imap_port,
-			Timeout  => 30
+			Timeout  => 30,
+			%ssl_verify_opts
 		) or die "Can't connect to $imap_host: $@";
+		my $subject_cn = $return->{'socket'}->peer_certificate('owner');
+		my $issuer_cn  = $return->{'socket'}->peer_certificate('authority');
+		dolog('info', "SSL subject: $subject_cn");
+		dolog('info', "SSL issuer: $issuer_cn");
 	}else{
 		dolog('info', "Starting plaintext connection to $imap_host:$imap_port.");
 		$return->{'socket'} = IO::Socket::INET->new(
