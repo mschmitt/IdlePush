@@ -22,3 +22,8 @@ ssl_CApath = /etc/ssl/certs
 # Optionally, specify the name of a log and PID file.
 #logfile   = ~/imapidle2prowl.log
 #pidfile   = ~/imapidle2prowl.pid
+
+# Optionally, specify the name of a file containing
+# a list of regular expressions of From addresses
+# to ignore (i.e. these will *not* be PROWled).
+# from_regex = noprowl.regexps

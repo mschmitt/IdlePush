@@ -35,6 +35,11 @@ my $ssl_CApath;
 if ($config->{'ssl_CApath'}){
 	$ssl_CApath = $config->{'ssl_CApath'};
 }
+my $fromregexStr;
+if ($config->{'from_regex'}){
+	$fromregexStr = read_re_file($config->{'from_regex'});
+}
+
 
 # Command line version of prowl.pl
 my $prowl = "$Bin/libexec/prowl.pl";
@@ -156,19 +161,26 @@ while(0 == $exitasap){
 					$imap->disconnect;
 					die "__PROWL_SKIP_EMPTY__";
 				}
-				# Build the command line for and execute prowl.pl
-				my @prowl_cmd;
-				push @prowl_cmd, $prowl;
-				push @prowl_cmd, "-apikey=$prowl_key";
-				push @prowl_cmd, "-application=$prowl_app";
-				push @prowl_cmd, "-event=New Mail";
-				push @prowl_cmd, "-notification=From $from, Subject: $subject";
-				push @prowl_cmd, "-priority=0";
-				system(@prowl_cmd);
-				dolog('debug', (join ' ', @prowl_cmd));
-				my $rc = $?>>8;
-				dolog('debug', "Call to prowl.pl returned exitcode: $rc");
-				die "__PROWL_FAIL__" unless (0 == $rc);
+
+				# Do we want to ignore this From: address?
+				if ($from =~ m/$fromregexStr/i) {
+					die "__DONT_PROWL__";
+				} else {
+
+					# Build the command line for and execute prowl.pl
+					my @prowl_cmd;
+					push @prowl_cmd, $prowl;
+					push @prowl_cmd, "-apikey=$prowl_key";
+					push @prowl_cmd, "-application=$prowl_app";
+					push @prowl_cmd, "-event=New Mail";
+					push @prowl_cmd, "-notification=From $from, Subject: $subject";
+					push @prowl_cmd, "-priority=0";
+					system(@prowl_cmd);
+					dolog('debug', (join ' ', @prowl_cmd));
+					my $rc = $?>>8;
+					dolog('debug', "Call to prowl.pl returned exitcode: $rc");
+					die "__PROWL_FAIL__" unless (0 == $rc);
+				}
 				# Exit loop and eval from here; let the main loop restart IDLE.
 				die "__DONE__";
 				# I don't seem to get the hang of eval. "last" doesn't work here.
@@ -189,6 +201,8 @@ while(0 == $exitasap){
 		dolog('info', 'Done, notification sent.');
 	}elsif($@ =~ /__PROWL_SKIP_EMPTY__/){
 		dolog('warn', 'Skipped bogus message details.');
+	}elsif($@ =~ /__DONT_PROWL__/){
+		dolog('info', "Skipped because From matches RE.");
 	}elsif($@ =~ /__PROWL_FAIL__/){
 		dolog('warn', 'Call to prowl.pl failed. Better luck next time?');
 	}elsif($@ =~ /__KILLED__/){
@@ -277,4 +291,26 @@ sub dolog {
 		print $log_out strftime("%Y-%m-%d %H:%M:%S [$lvl] $msg\n",localtime(time));
 		close $log_out;
 	}
+}
+
+sub read_re_file {
+	my $re_file = shift;
+	die "RE file missing!\n" unless ($re_file);
+	my @re;
+	open my $re_in, "<$re_file" or die "Can't read $re_file: $!\n";
+	while(<$re_in>){
+		next if /^#/;
+		chomp;
+		s/^\s+//; 
+		s/\s+$//;
+		next unless length;     # anything left?
+		push @re, $_;
+	}
+	close $re_in;
+	
+	# http://www.perlmonks.org/?node_id=621975
+	$fromregexStr="("
+		. (join "|",@re)
+		. ")";
+	return $fromregexStr;
 }
