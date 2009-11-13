@@ -80,8 +80,15 @@ if ($pidfile){
 my $imap;
 my $socket;
 
+# Track whether the program has been killed.
+my $exitasap = 0;
+
+# Signal handlers. Beware, these are manipulated later on.
+$SIG{'TERM'} = sub { $exitasap = 1; };
+$SIG{'INT'}  = sub { $exitasap = 1; };
+
 # The main loop revolves around IDLE-recycling as mandated by RFC 2177
-while(1){
+while(0 == $exitasap){
 	dolog('debug', 'Start main loop.');
 	# See if we are connected.
 	if ($imap and $imap->noop){
@@ -111,9 +118,14 @@ while(1){
 	dolog('debug', 'About to enter IDLE state.');
 	my $session = $imap->idle or die "Couldn't idle: $@\n";
 	dolog('debug', 'IDLE state entered.');
-	# Perl Cookbook 16.21: "Timing Out an Operation"
-	$SIG{'ALRM'} = sub { die "__TIMEOUT__" };
+	# Track how long we've been in IDLE state.
+	my $idle_start = time();
 	eval {
+		# Perl Cookbook 16.21: "Timing Out an Operation"
+		$SIG{'ALRM'} = sub { die "__TIMEOUT__" };
+		# Handle signals inside eval different than outside.
+		$SIG{'TERM'} = sub { $exitasap = 1; die "__KILLED__" };
+		$SIG{'INT'}  = sub { $exitasap = 1; die "__KILLED__" };
 		alarm($interval);
 		dolog('debug', "Start eval. Alarm set. Gauge at $gauge.");
 		while(my $in = <$socket>){
@@ -164,9 +176,14 @@ while(1){
 			}
 		}
 	};
-	# Executed when the timeout for re-cycling the IDLE session has struck.
+	# Handle signals outside eval different than inside.
+	$SIG{'TERM'} = sub { $exitasap = 1; };
+	$SIG{'INT'}  = sub { $exitasap = 1; };
+	# Handle different states how IDLE may have ended.
 	if ($@ =~ /__TIMEOUT__/){
-		dolog('info', "Recycling IDLE session after $interval seconds.");
+		my $idle_end = time();
+		my $idle_duration = $idle_end - $idle_start;
+		dolog('info', "Recycling IDLE session after $idle_duration seconds.");
 		$imap->done($session);
 	}elsif($@ =~ /__DONE__/){
 		dolog('info', 'Done, notification sent.');
@@ -174,10 +191,16 @@ while(1){
 		dolog('warn', 'Skipped bogus message details.');
 	}elsif($@ =~ /__PROWL_FAIL__/){
 		dolog('warn', 'Call to prowl.pl failed. Better luck next time?');
+	}elsif($@ =~ /__KILLED__/){
+		dolog('debug', 'Kill received while working the socket loop.');
+		last;
 	}else{
 		dolog('warn', 'Socket read loop ended by itself. Disconnected from server?');
 	}
 }
+
+dolog('info', 'Exiting.');
+exit 0;
 
 sub connect_imap{
 	# Wee need the IMAP object for IMAP transaction
