@@ -84,7 +84,10 @@ my $socket;
 while(1){
 	dolog('debug', 'Start main loop.');
 	# See if we are connected.
-	unless ($imap and $imap->noop){
+	if ($imap and $imap->noop){
+		dolog('debug', 'Connection checked: still alive');
+	}else{
+		dolog('debug', 'Connection checked: needs reconnect.');
 		$imap->disconnect if ($imap);
 		dolog('info', 'Connecting to IMAP.');
 		# Open IMAP connection.
@@ -99,11 +102,15 @@ while(1){
 		$imap->Uid(0);
 	}
 	# Synchronize message gauge from message count
+	dolog('debug', 'Requesting message count from server.');
 	my $gauge = $imap->message_count;
+	dolog('debug', "$gauge messages on server.");
 	# RFC2177 demands re-cycling the connection once in a while.
 	my $interval = 25*60; # 25 minutes
 	# Send session into idle state
+	dolog('debug', 'About to enter IDLE state.');
 	my $session = $imap->idle or die "Couldn't idle: $@\n";
+	dolog('debug', 'IDLE state entered.');
 	# Perl Cookbook 16.21: "Timing Out an Operation"
 	$SIG{'ALRM'} = sub { die "__TIMEOUT__" };
 	eval {
