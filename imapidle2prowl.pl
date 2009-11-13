@@ -153,15 +153,16 @@ while(0 == $exitasap){
 				$imap->done($session);
 				# Retrieve and mangle new message headers.
 				my $header  = $imap->parse_headers($exists_id, 'Subject', 'From');
-				my $subject = decode_mimewords($header->{'Subject'}->[0], Charset => 'utf-8');
-				my $from    = decode_mimewords($header->{'From'}->[0],    Charset => 'utf-8');
-				dolog('info', "New message from $from, Subject: $subject");
-				unless ($header and $subject and $from){
+				unless ($header){
 					dolog('warn', 'Empty message details. Skipping prowl, killing IMAP session.');
 					$imap->disconnect;
 					die "__PROWL_SKIP_EMPTY__";
 				}
-
+				my $subjraw = $header->{'Subject'}->[0] ? $header->{'Subject'}->[0] : '';
+				my $fromraw = $header->{'From'}->[0]    ? $header->{'From'}->[0]    : '<>';
+				my $subject = decode_mimewords($subjraw, Charset => 'utf-8');
+				my $from    = decode_mimewords($fromraw, Charset => 'utf-8');
+				dolog('info', "New message from $from, Subject: $subject");
 				# Do we want to ignore this From: address?
 				if ($from =~ m/$fromregexStr/i) {
 					die "__DONT_PROWL__";
