@@ -193,6 +193,7 @@ while(0 == $exitasap){
 	$SIG{'TERM'} = sub { $exitasap = 1; };
 	$SIG{'INT'}  = sub { $exitasap = 1; };
 	# Handle different states how IDLE may have ended.
+	dolog('debug', "Eval has ended. \$\@ contains: $@");
 	if ($@ =~ /__TIMEOUT__/){
 		my $idle_end = time();
 		my $idle_duration = $idle_end - $idle_start;
