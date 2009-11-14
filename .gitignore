@@ -1,3 +1,2 @@
-scsy.cfg
-gmail.cfg
-noprowl.regexps
+*.cfg
+*.regexps
