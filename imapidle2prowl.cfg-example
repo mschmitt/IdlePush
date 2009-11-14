@@ -27,3 +27,8 @@ ssl_CApath = /etc/ssl/certs
 # a list of regular expressions of From addresses
 # to ignore (i.e. these will *not* be PROWled).
 # from_regex = noprowl.regexps
+
+# Optionally, specify the name of a file containing
+# a list of regular expressions of Subject lines
+# to ignore (i.e. these will *not* be PROWled).
+# subj_regex = noprowl-subj.regexps
