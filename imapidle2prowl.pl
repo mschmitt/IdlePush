@@ -39,6 +39,10 @@ my $fromregexStr;
 if ($config->{'from_regex'}){
 	$fromregexStr = read_re_file($config->{'from_regex'});
 }
+my $subjregexStr;
+if ($config->{'subj_regex'}){
+	$subjregexStr = read_re_file($config->{'subj_regex'});
+}
 
 
 # Command line version of prowl.pl
@@ -165,7 +169,9 @@ while(0 == $exitasap){
 				dolog('info', "New message from $from, Subject: $subject");
 				# Do we want to ignore this From: address?
 				if ($from =~ m/$fromregexStr/i) {
-					die "__DONT_PROWL__";
+					die "__DONT_PROWL_FROM__";
+				} elsif ($subject =~ m/$subjregexStr/i) {
+					die "__DONT_PROWL_SUBJ__";
 				} else {
 
 					# Build the command line for and execute prowl.pl
@@ -203,8 +209,10 @@ while(0 == $exitasap){
 		dolog('info', 'Done, notification sent.');
 	}elsif($@ =~ /__PROWL_SKIP_EMPTY__/){
 		dolog('warn', 'Skipped bogus message details.');
-	}elsif($@ =~ /__DONT_PROWL__/){
+	}elsif($@ =~ /__DONT_PROWL_FROM__/){
 		dolog('info', "Skipped because From matches RE.");
+	}elsif($@ =~ /__DONT_PROWL_SUBJ/){
+		dolog('info', "Skipped because Subject matches RE.");
 	}elsif($@ =~ /__PROWL_FAIL__/){
 		dolog('warn', 'Call to prowl.pl failed. Better luck next time?');
 	}elsif($@ =~ /__KILLED__/){
