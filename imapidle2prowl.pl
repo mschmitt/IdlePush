@@ -319,8 +319,8 @@ sub read_re_file {
 	close $re_in;
 	
 	# http://www.perlmonks.org/?node_id=621975
-	$fromregexStr="("
+	my $reStr = "("
 		. (join "|",@re)
 		. ")";
-	return $fromregexStr;
+	return $reStr;
 }
