@@ -3,7 +3,7 @@ GhettoPush
 
 A Perl implementation of IMAP push for the iPhone with generic IMAP servers.
 
-http://github.com/unixtippse/GhettoPush
+http://github.com/mschmitt/GhettoPush
 
 Requires
 --------
