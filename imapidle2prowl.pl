@@ -44,7 +44,6 @@ if ($config->{'subj_regex'}){
 	$subjregexStr = read_re_file($config->{'subj_regex'});
 }
 
-
 # Command line version of prowl.pl
 my $prowl = "$Bin/libexec/prowl.pl";
 unless (-x $prowl){
@@ -110,7 +109,16 @@ while(0 == $exitasap){
 		my $returned = connect_imap();
 		$imap   = $returned->{'imap'};
 		$socket = $returned->{'socket'};
-		$imap->select($imap_box) or die "Could not select folder $imap_box: $@\n";
+		unless ($imap){
+			dolog('error', 'No IMAP session was established. Retry after 60 seconds.');
+			sleep 10;
+			next;
+		}
+		$imap->select($imap_box);
+		unless ($imap->IsSelected()){
+			dolog('error', "Failed to select folder: $imap_box - Exiting.");
+			last;
+		}
 		# Peek means, don't change any message flags.
 		$imap->Peek(1);
 		# Do not use Uids for transactions, so we can work with the 
@@ -125,7 +133,11 @@ while(0 == $exitasap){
 	my $interval = 25*60; # 25 minutes
 	# Send session into idle state
 	dolog('debug', 'About to enter IDLE state.');
-	my $session = $imap->idle or die "Couldn't idle: $@\n";
+	my $session = $imap->idle;
+	unless ($session){
+		dolog('error', 'Could not initiate IDLE state. Non-recoverable error? Exiting!');
+		last;
+	}
 	dolog('debug', 'IDLE state entered.');
 	# Track how long we've been in IDLE state.
 	my $idle_start = time();
@@ -242,31 +254,42 @@ sub connect_imap{
 				SSL_ca_path     => $ssl_CApath
 			);
 		}
-			
 		$return->{'socket'} = IO::Socket::SSL->new(
 			PeerAddr => $imap_host,
 			PeerPort => $imap_port,
 			Timeout  => 30,
 			%ssl_verify_opts
-		) or die "Can't connect to $imap_host: $@";
-		my $subject_cn = $return->{'socket'}->peer_certificate('owner');
-		my $issuer_cn  = $return->{'socket'}->peer_certificate('authority');
-		dolog('info', "SSL subject: $subject_cn");
-		dolog('info', "SSL issuer: $issuer_cn");
+		);
+		if ($return->{'socket'}){
+			my $subject_cn = $return->{'socket'}->peer_certificate('owner');
+			my $issuer_cn  = $return->{'socket'}->peer_certificate('authority');
+			dolog('info', "SSL subject: $subject_cn");
+			dolog('info', "SSL issuer: $issuer_cn");
+		}else{
+			dolog('error', "SSL connection to $imap_host failed: ".IO::Socket::SSL::errstr());
+			return $return;
+		}
 	}else{
 		dolog('info', "Starting plaintext connection to $imap_host:$imap_port.");
 		$return->{'socket'} = IO::Socket::INET->new(
 			PeerAddr => $imap_host,
 			PeerPort => $imap_port,
 			Timeout  => 30
-		) or die "Can't connect to $imap_host: $@";
+		);
+		unless ($return->{'socket'}){
+			dolog('error', "Connection to $imap_host failed.");
+			return $return;
+		}
 	}
 	$return->{'imap'} = Mail::IMAPClient->new(
 		Socket     => $return->{'socket'},
 		User       => $imap_user,
 		Password   => $imap_pass,
 		Timeout    => 60
-	) or die "Can't login as $imap_user: $@\n";
+	);
+	unless ($return->{'imap'}->IsAuthenticated()){
+		dolog('error', "IMAP authentication on $imap_host failed.");
+	}
 	return $return;
 }
 
