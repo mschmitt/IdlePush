@@ -180,9 +180,9 @@ while(0 == $exitasap){
 				my $from    = decode_mimewords($fromraw, Charset => 'utf-8');
 				dolog('info', "New message from $from, Subject: $subject");
 				# Do we want to ignore this From: address?
-				if ($from =~ m/$fromregexStr/i) {
+				if ($config->{'from_regex'} and ($from =~ m/$fromregexStr/i)) {
 					die "__DONT_PROWL_FROM__";
-				} elsif ($subject =~ m/$subjregexStr/i) {
+				} elsif ($config->{'subj_regex'} and ($subject =~ m/$subjregexStr/i)) {
 					die "__DONT_PROWL_SUBJ__";
 				} else {
 
