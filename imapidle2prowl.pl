@@ -234,7 +234,22 @@ while(0 == $exitasap){
 		dolog('warn', 'Socket read loop ended by itself. Disconnected from server?');
 	}
 }
-
+if (0 == $exitasap){
+	# Exiting without being killed. Notify owner.
+	dolog('info', 'Notifying owner about unexpected exit.');
+	# Build the command line for and execute prowl.pl
+	my @prowl_cmd;
+	push @prowl_cmd, $prowl;
+	push @prowl_cmd, "-apikey=$prowl_key";
+	push @prowl_cmd, "-application=$prowl_app";
+	push @prowl_cmd, "-event=Unexpected Exit";
+	push @prowl_cmd, "-notification=imapidle2prowl.pl $ARGV[0] exiting unexpectedly. Please check logs!";
+	push @prowl_cmd, "-priority=0";
+	system(@prowl_cmd);
+	dolog('debug', (join ' ', @prowl_cmd));
+	my $rc = $?>>8;
+	dolog('debug', "Call to prowl.pl returned exitcode: $rc");
+}
 dolog('info', 'Exiting.');
 exit 0;
 
