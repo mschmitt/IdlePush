@@ -21,6 +21,8 @@ ssl_CApath = /etc/ssl/certs
 
 # Optionally, specify the name of a log and PID file.
 #logfile   = ~/imapidle2prowl.log
+# Alternatively, log to syslog with descriptive tag.
+#logfile   = syslog:mymail@example.com
 #pidfile   = ~/imapidle2prowl.pid
 
 # Optionally, specify the name of a file containing

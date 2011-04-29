@@ -21,7 +21,10 @@ my $imap_box  = $config->{'imap_box'};
 my $imap_ssl  = $config->{'imap_ssl'};
 my $logfile;
 if ($config->{'logfile'}){
-	$logfile = glob($config->{'logfile'});
+	$logfile = $config->{'logfile'};
+	if ($logfile =~ /^syslog:/){
+		use Sys::Syslog qw(:standard);
+	}
 }
 my $pidfile;
 if ($config->{'pidfile'}){
@@ -335,9 +338,19 @@ sub dolog {
 	}
 	print STDERR "[$lvl] $msg\n";
 	if ($logfile){
-		open my $log_out, ">>$logfile" or die "Can't write to $logfile: $!\n";
-		print $log_out strftime("%Y-%m-%d %H:%M:%S [$lvl] $msg\n",localtime(time));
-		close $log_out;
+		if ($logfile =~ /^syslog:(.+)$/){
+			# Syslog here
+			my $tag = "GhettoPush/$1";
+			my $facility = 'mail';
+			openlog($tag, 'pid', $facility);
+			syslog($lvl, $msg);
+			closelog();
+		}else{
+			$logfile = glob($logfile);
+			open my $log_out, ">>$logfile" or die "Can't write to $logfile: $!\n";
+			print $log_out strftime("%Y-%m-%d %H:%M:%S [$lvl] $msg\n",localtime(time));
+			close $log_out;
+		}
 	}
 }
 
