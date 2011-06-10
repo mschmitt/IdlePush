@@ -179,7 +179,7 @@ while(0 == $exitasap){
 				# Retrieve and mangle new message headers.
 				my $header  = $imap->parse_headers($exists_id, 'Subject', 'From');
 				unless ($header){
-					dolog('warn', 'Empty message details. Skipping prowl, killing IMAP session.');
+					dolog('warning', 'Empty message details. Skipping prowl, killing IMAP session.');
 					$imap->disconnect;
 					die "__PROWL_SKIP_EMPTY__";
 				}
@@ -229,18 +229,18 @@ while(0 == $exitasap){
 	}elsif($@ =~ /__DONE__/){
 		dolog('info', 'Done, notification sent.');
 	}elsif($@ =~ /__PROWL_SKIP_EMPTY__/){
-		dolog('warn', 'Skipped bogus message details.');
+		dolog('warning', 'Skipped bogus message details.');
 	}elsif($@ =~ /__DONT_PROWL_FROM__/){
 		dolog('info', "Skipped because From matches RE.");
 	}elsif($@ =~ /__DONT_PROWL_SUBJ/){
 		dolog('info', "Skipped because Subject matches RE.");
 	}elsif($@ =~ /__PROWL_FAIL__/){
-		dolog('warn', 'Call to prowl.pl failed. Better luck next time?');
+		dolog('warning', 'Call to prowl.pl failed. Better luck next time?');
 	}elsif($@ =~ /__KILLED__/){
 		dolog('debug', 'Kill received while working the socket loop.');
 		last;
 	}else{
-		dolog('warn', 'Socket read loop ended by itself. Disconnected from server?');
+		dolog('warning', 'Socket read loop ended by itself. Disconnected from server?');
 	}
 }
 if (0 == $exitasap){
