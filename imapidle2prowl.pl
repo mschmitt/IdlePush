@@ -65,6 +65,12 @@ if ($pidfile){
 	}
 }
 
+# Dump module versions. For debugging.
+dolog('debug', "IO::Socket::INET has version: $IO::Socket::INET::VERSION");
+dolog('debug', "IO::Socket::SSL has version: $IO::Socket::SSL::VERSION");
+dolog('debug', "Mail::IMAPClient has version: $Mail::IMAPClient::VERSION");
+dolog('debug', "MIME::EncWords has version: $MIME::EncWords::VERSION");
+
 # Fork unless told otherwise 
 # set environment NOFORK=1 to run in foreground
 # e.g.: NOFORK=1 ./imapidle2prowl.pl config.cfg
@@ -336,7 +342,7 @@ sub dolog {
 	if ($lvl eq "debug"){
 		return unless ($ENV{'DEBUG'});
 	}
-	print STDERR "[$lvl] $msg\n";
+	print STDERR strftime("%Y-%m-%d %H:%M:%S [$lvl] $msg\n", localtime(time));
 	if ($logfile){
 		if ($logfile =~ /^syslog:(.+)$/){
 			# Syslog here
