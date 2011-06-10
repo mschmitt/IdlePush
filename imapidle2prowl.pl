@@ -147,7 +147,7 @@ while(0 == $exitasap){
 		dolog('error', 'Could not initiate IDLE state. Non-recoverable error? Exiting!');
 		last;
 	}
-	dolog('debug', 'IDLE state entered.');
+	dolog('debug', "IDLE state entered. Session ID is: $session");
 	# Track how long we've been in IDLE state.
 	my $idle_start = time();
 	eval {
@@ -157,7 +157,9 @@ while(0 == $exitasap){
 		$SIG{'TERM'} = sub { $exitasap = 1; die "__KILLED__" };
 		$SIG{'INT'}  = sub { $exitasap = 1; die "__KILLED__" };
 		alarm($interval);
-		dolog('debug', "Start eval. Alarm set. Gauge at $gauge.");
+		dolog('debug', "Start eval. Alarm set. Gauge at $gauge. Nibbling on the raw socket.");
+		dolog('debug', "Socket is: " . $socket->sockhost. ':' . $socket->sockport . '->' . $socket->peerhost . ':' . $socket->peerport );
+
 		while(my $in = <$socket>){
 			dolog('debug', "read from socket: $in");
 			if ($in =~ /\b(\d+) EXPUNGE\b/i){
@@ -213,6 +215,8 @@ while(0 == $exitasap){
 				die "__DONE__";
 				# I don't seem to get the hang of eval. "last" doesn't work here.
 				# Please, if you can, submit something else. ;-)
+			}else{
+				dolog('debug', "Garbage from socket: $in");
 			}
 		}
 	};
@@ -221,6 +225,7 @@ while(0 == $exitasap){
 	$SIG{'INT'}  = sub { $exitasap = 1; };
 	# Handle different states how IDLE may have ended.
 	dolog('debug', "Eval has ended. \$\@ contains: $@");
+	sleep 5;
 	if ($@ =~ /__TIMEOUT__/){
 		my $idle_end = time();
 		my $idle_duration = $idle_end - $idle_start;
@@ -267,6 +272,7 @@ sub connect_imap{
 	# as well as the raw socket for listening in on IDLE state.
 	# This subroutine returns them both.
 	my $return;
+	dolog('debug', 'Control is now in connect_imap()');
 	# Instantiate Socket in plain or in SSL, depending on 
 	# configuration. 
 	if ($imap_ssl and ($imap_ssl =~ /^(yes|true|1)$/i)){
@@ -314,6 +320,7 @@ sub connect_imap{
 	unless ($return->{'imap'}->IsAuthenticated()){
 		dolog('error', "IMAP authentication on $imap_host failed.");
 	}
+	dolog('debug', 'About to return the IMAP client object from connect_imap()');
 	return $return;
 }
 
