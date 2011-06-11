@@ -160,6 +160,12 @@ while(0 == $exitasap){
 		dolog('debug', "Start eval. Alarm set. Gauge at $gauge. Nibbling on the raw socket.");
 		dolog('debug', "Socket is: " . $socket->sockhost. ':' . $socket->sockport . '->' . $socket->peerhost . ':' . $socket->peerport );
 
+		# Compatibility magic for never versions of Mail::IMAPClient ca. 3.25-3.28 
+		my $oldblocking = $socket->blocking();
+		$socket->blocking(1);
+		my $newblocking = $socket->blocking();
+		dolog('debug', "Forcing socket to blocking mode. Status old -> new: $oldblocking -> $newblocking");
+
 		while(my $in = <$socket>){
 			dolog('debug', "read from socket: $in");
 			if ($in =~ /\b(\d+) EXPUNGE\b/i){
@@ -216,7 +222,7 @@ while(0 == $exitasap){
 				# I don't seem to get the hang of eval. "last" doesn't work here.
 				# Please, if you can, submit something else. ;-)
 			}else{
-				dolog('debug', "Garbage from socket: $in");
+				dolog('debug', "Ignoring data from socket: $in");
 			}
 		}
 	};
