@@ -46,6 +46,18 @@ my $subjregexStr;
 if ($config->{'subj_regex'}){
 	$subjregexStr = read_re_file($config->{'subj_regex'});
 }
+my $startup_notify = 'no';
+if ($config->{'startup_notify'}){
+	$startup_notify = $config->{'startup_notify'};
+}
+my $exit_notify = 'no';
+if ($config->{'exit_notify'}){
+	$exit_notify = $config->{'exit_notify'};
+}
+my $crash_notify = 'yes';
+if ($config->{'crash_notify'}){
+	$crash_notify = $config->{'crash_notify'};
+}
 
 # Command line version of prowl.pl
 my $prowl = "$Bin/libexec/prowl.pl";
@@ -96,6 +108,25 @@ if ($pidfile){
 # Holds connections throughout multiple cycles of the main loop.
 my $imap;
 my $socket;
+
+if ($startup_notify and ($startup_notify =~ /^(yes|true|1)$/i)){
+	# Tell the owner that I'm coming up.
+	dolog('info', 'Notifying owner about startup.');
+	# Build the command line for and execute prowl.pl
+	my @prowl_cmd;
+	push @prowl_cmd, $prowl;
+	push @prowl_cmd, "-apikey=$prowl_key";
+	push @prowl_cmd, "-application=$prowl_app";
+	push @prowl_cmd, "-event=Startup";
+	push @prowl_cmd, "-notification=GhettoPush for ${imap_user}\@${imap_host} is up and running.";
+	push @prowl_cmd, "-priority=0";
+	system(@prowl_cmd);
+	dolog('debug', (join ' ', @prowl_cmd));
+	my $rc = $?>>8;
+	dolog('debug', "Call to prowl.pl returned exitcode: $rc");
+}else{
+	dolog('info', "Notification on startup not requested.");
+}
 
 # Track whether the program has been killed.
 my $exitasap = 0;
@@ -254,22 +285,47 @@ while(0 == $exitasap){
 		dolog('warning', 'Socket read loop ended by itself. Disconnected from server?');
 	}
 }
+dolog('debug', 'Main loop has ended, preparing for exit.');
 if (0 == $exitasap){
-	# Exiting without being killed. Notify owner.
-	dolog('info', 'Notifying owner about unexpected exit.');
-	# Build the command line for and execute prowl.pl
-	my @prowl_cmd;
-	push @prowl_cmd, $prowl;
-	push @prowl_cmd, "-apikey=$prowl_key";
-	push @prowl_cmd, "-application=$prowl_app";
-	push @prowl_cmd, "-event=Unexpected Exit";
-	push @prowl_cmd, "-notification=imapidle2prowl.pl $ARGV[0] exiting unexpectedly. Please check logs!";
-	push @prowl_cmd, "-priority=0";
-	system(@prowl_cmd);
-	dolog('debug', (join ' ', @prowl_cmd));
-	my $rc = $?>>8;
-	dolog('debug', "Call to prowl.pl returned exitcode: $rc");
+	if ($crash_notify and ($crash_notify =~ /^(yes|true|1)$/i)){
+		# Exiting without being killed. Notify owner.
+		dolog('info', 'Notifying owner about unexpected exit.');
+		# Build the command line for and execute prowl.pl
+		my @prowl_cmd;
+		push @prowl_cmd, $prowl;
+		push @prowl_cmd, "-apikey=$prowl_key";
+		push @prowl_cmd, "-application=$prowl_app";
+		push @prowl_cmd, "-event=Unexpected Exit";
+		push @prowl_cmd, "-notification=GhettoPush for ${imap_user}\@${imap_host} exiting unexpectedly. Please check logs!";
+		push @prowl_cmd, "-priority=0";
+		system(@prowl_cmd);
+		dolog('debug', (join ' ', @prowl_cmd));
+		my $rc = $?>>8;
+		dolog('debug', "Call to prowl.pl returned exitcode: $rc");
+	}else{
+		dolog('info', "Notification on crash not requested.");
+	}
+}elsif (1 == $exitasap) {
+	if ($exit_notify and ($exit_notify =~ /^(yes|true|1)$/i)){
+		# Controlled exit. Notify owner.
+		dolog('info', 'Notifying owner about controlled exit.');
+		# Build the command line for and execute prowl.pl
+		my @prowl_cmd;
+		push @prowl_cmd, $prowl;
+		push @prowl_cmd, "-apikey=$prowl_key";
+		push @prowl_cmd, "-application=$prowl_app";
+		push @prowl_cmd, "-event=Killed";
+		push @prowl_cmd, "-notification=GhettoPush for ${imap_user}\@${imap_host} exiting. (Killed.)";
+		push @prowl_cmd, "-priority=0";
+		system(@prowl_cmd);
+		dolog('debug', (join ' ', @prowl_cmd));
+		my $rc = $?>>8;
+		dolog('debug', "Call to prowl.pl returned exitcode: $rc");
+	}else{
+		dolog('info', "Notification on controlled exit not requested.");
+	}
 }
+
 dolog('info', 'Exiting.');
 exit 0;
 

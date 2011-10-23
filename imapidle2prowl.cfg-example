@@ -34,3 +34,14 @@ ssl_CApath = /etc/ssl/certs
 # a list of regular expressions of Subject lines
 # to ignore (i.e. these will *not* be PROWled).
 # subj_regex = noprowl-subj.regexps
+
+# Send notifications on events
+#
+# Program startup (default no)
+#startup_notify = no
+#
+# Controlled exit (default no)
+#exit_notify    = no
+#
+# Exit because of unrecoverable IMAP error (default yes)
+#crash_notify   = yes
