@@ -119,13 +119,13 @@ while(0 == $exitasap){
 		$imap   = $returned->{'imap'};
 		$socket = $returned->{'socket'};
 		unless ($imap){
-			dolog('error', 'No IMAP session was established. Retry after 60 seconds.');
-			sleep 10;
+			dolog('err', 'No IMAP session was established. Retry after 60 seconds.');
+			sleep 60;
 			next;
 		}
 		$imap->select($imap_box);
 		unless ($imap->IsSelected()){
-			dolog('error', "Failed to select folder: $imap_box - Exiting.");
+			dolog('err', "Failed to select folder: $imap_box - Exiting.");
 			last;
 		}
 		# Peek means, don't change any message flags.
@@ -144,7 +144,7 @@ while(0 == $exitasap){
 	dolog('debug', 'About to enter IDLE state.');
 	my $session = $imap->idle;
 	unless ($session){
-		dolog('error', 'Could not initiate IDLE state. Non-recoverable error? Exiting!');
+		dolog('err', 'Could not initiate IDLE state. Non-recoverable error? Exiting!');
 		last;
 	}
 	dolog('debug', "IDLE state entered. Session ID is: $session");
@@ -302,7 +302,7 @@ sub connect_imap{
 			dolog('info', "SSL subject: $subject_cn");
 			dolog('info', "SSL issuer: $issuer_cn");
 		}else{
-			dolog('error', "SSL connection to $imap_host failed: ".IO::Socket::SSL::errstr());
+			dolog('err', "SSL connection to $imap_host failed: ".IO::Socket::SSL::errstr());
 			return $return;
 		}
 	}else{
@@ -313,7 +313,7 @@ sub connect_imap{
 			Timeout  => 30
 		);
 		unless ($return->{'socket'}){
-			dolog('error', "Connection to $imap_host failed.");
+			dolog('err', "Connection to $imap_host failed.");
 			return $return;
 		}
 	}
@@ -324,7 +324,7 @@ sub connect_imap{
 		Timeout    => 60
 	);
 	unless ($return->{'imap'}->IsAuthenticated()){
-		dolog('error', "IMAP authentication on $imap_host failed.");
+		dolog('err', "IMAP authentication on $imap_host failed.");
 	}
 	dolog('debug', 'About to return the IMAP client object from connect_imap()');
 	return $return;
