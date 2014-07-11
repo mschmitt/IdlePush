@@ -12,8 +12,24 @@ use FindBin qw($Bin);
 
 # Config file syntax, see .cfg-example
 my $config = read_config();
-my $prowl_app = $config->{'prowl_app'};
-my $prowl_key = $config->{'prowl_key'};
+
+# Check which push service was selected
+my $push_service = '';
+my $prowl_app;
+my $prowl_key;
+my $pushover_user;
+my $pushover_app;
+if ($config->{'push_service'}){
+	$push_service = $config->{'push_service'};
+}
+if ($push_service eq 'prowl'){
+	$prowl_app = $config->{'prowl_app'} or die "prowl not properly configured\n";
+	$prowl_key = $config->{'prowl_key'} or die "prowl not properly configured\n";
+}elsif($push_service eq 'pushover'){
+	$pushover_user = $config->{'pushover_user'} or die "pushover not properly configured\n";
+	$pushover_app  = $config->{'pushover_app'} or die "pushover not properly configured\n";
+}
+
 my $imap_host = $config->{'imap_host'};
 my $imap_port = $config->{'imap_port'};
 my $imap_user = $config->{'imap_user'};
@@ -281,7 +297,15 @@ exit 0;
 sub notify{
 	my $event = shift;
 	my $message = shift;
-	notify_by_prowl($event, $message);
+	unless ($push_service){
+		dolog('debug', 'No push service configured. Does this make sense?');
+		return;
+	}
+	if ($push_service eq 'prowl'){
+		notify_by_prowl($event, $message);
+	}elsif($push_service eq 'pushover'){
+		notify_by_pushover($event, $message);
+	}
 }
 
 sub notify_by_prowl{
@@ -308,6 +332,32 @@ sub notify_by_prowl{
 		dolog('debug', 'Prowl notification failed:' . $response->content);
 	}
 }
+
+sub notify_by_pushover{
+	my $event = shift;
+	my $message = shift;
+
+	my $ua = LWP::UserAgent->new();
+	$ua->agent("GhettoPush/0.1");
+	$ua->env_proxy();
+
+	my $url = sprintf("https://api.pushover.net/1/messages.json?user=%s&token=%s&title=%s&message=%s&priority=0&url=mailto:",
+		$pushover_user,
+		$pushover_app,
+		$event,
+		$message
+	);
+	dolog('debug', 'URL is: ' . $url);
+	my $request = HTTP::Request->new(POST => $url);
+	my $response = $ua->request($request);
+	if ($response->is_success){
+		dolog('debug', 'Pushover notification succeeded.');
+	}else{
+		dolog('debug', 'Pushover notification failed:' . $response->content);
+	}
+}
+
+
 
 sub connect_imap{
 	# Wee need the IMAP object for IMAP transaction

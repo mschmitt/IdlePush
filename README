@@ -8,9 +8,9 @@ http://github.com/mschmitt/GhettoPush
 Requires
 --------
 
-- The Prowl application on the iPhone (available from iTunes).
+- The Prowl app and an API key
 
-- An API key for the Prowl service from http://prowl.weks.net
+- Alternatively: The Pushover app and User/API tokens
 
 - The non-standard Perl modules:
 
@@ -39,7 +39,7 @@ don't even need to issue c_rehash there.
 Copyright and license
 ---------------------
 
-Copyright (c) 2009, Martin Schmitt <mas at scsy dot de>
+Copyright (c) 2009-2014, Martin Schmitt <mas at scsy dot de>
 
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above

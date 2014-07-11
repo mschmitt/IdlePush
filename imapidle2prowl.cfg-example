@@ -4,6 +4,13 @@ prowl_app = IMAP
 # Prowl API key
 prowl_key = abcdef...
 
+# Alternatively, use the Pushover service:
+#
+#push_service  = pushover
+#pushover_user = xxx
+#pushover_app  = yyy
+
+
 # IMAP server data
 imap_host = 127.0.0.1
 imap_port = 143
