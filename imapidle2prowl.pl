@@ -3,6 +3,7 @@ use strict;
 use diagnostics;
 use IO::Socket::INET;
 use IO::Socket::SSL;
+use LWP::UserAgent;
 use POSIX qw(setsid strftime);
 use Fcntl qw(:flock);
 use Mail::IMAPClient 3.18;
@@ -59,12 +60,6 @@ if ($config->{'crash_notify'}){
 	$crash_notify = $config->{'crash_notify'};
 }
 
-# Command line version of prowl.pl
-my $prowl = "$Bin/libexec/prowl.pl";
-unless (-x $prowl){
-	die "$prowl not found or not executable.\n";
-}
-
 # Open Pidfile and lock it, if requested.
 my $lock_fh;
 if ($pidfile){
@@ -112,18 +107,7 @@ my $socket;
 if ($startup_notify and ($startup_notify =~ /^(yes|true|1)$/i)){
 	# Tell the owner that I'm coming up.
 	dolog('info', 'Notifying owner about startup.');
-	# Build the command line for and execute prowl.pl
-	my @prowl_cmd;
-	push @prowl_cmd, $prowl;
-	push @prowl_cmd, "-apikey=$prowl_key";
-	push @prowl_cmd, "-application=$prowl_app";
-	push @prowl_cmd, "-event=Startup";
-	push @prowl_cmd, "-notification=GhettoPush for ${imap_user}\@${imap_host} is up and running.";
-	push @prowl_cmd, "-priority=0";
-	system(@prowl_cmd);
-	dolog('debug', (join ' ', @prowl_cmd));
-	my $rc = $?>>8;
-	dolog('debug', "Call to prowl.pl returned exitcode: $rc");
+	notify('Startup', "GhettoPush for ${imap_user}\@${imap_host} is up and running.");
 }else{
 	dolog('info', "Notification on startup not requested.");
 }
@@ -233,20 +217,7 @@ while(0 == $exitasap){
 				} elsif ($config->{'subj_regex'} and ($subject =~ m/$subjregexStr/i)) {
 					die "__DONT_PROWL_SUBJ__";
 				} else {
-
-					# Build the command line for and execute prowl.pl
-					my @prowl_cmd;
-					push @prowl_cmd, $prowl;
-					push @prowl_cmd, "-apikey=$prowl_key";
-					push @prowl_cmd, "-application=$prowl_app";
-					push @prowl_cmd, "-event=New Mail";
-					push @prowl_cmd, "-notification=From $from, Subject: $subject";
-					push @prowl_cmd, "-priority=0";
-					system(@prowl_cmd);
-					dolog('debug', (join ' ', @prowl_cmd));
-					my $rc = $?>>8;
-					dolog('debug', "Call to prowl.pl returned exitcode: $rc");
-					die "__PROWL_FAIL__" unless (0 == $rc);
+					notify('New Mail', "From $from, Subject: $subject") or die '__PROWL_FAIL__';
 				}
 				# Exit loop and eval from here; let the main loop restart IDLE.
 				die "__DONE__";
@@ -277,7 +248,7 @@ while(0 == $exitasap){
 	}elsif($@ =~ /__DONT_PROWL_SUBJ/){
 		dolog('info', "Skipped because Subject matches RE.");
 	}elsif($@ =~ /__PROWL_FAIL__/){
-		dolog('warning', 'Call to prowl.pl failed. Better luck next time?');
+		dolog('warning', 'Prowl failed. Better luck next time?');
 	}elsif($@ =~ /__KILLED__/){
 		dolog('debug', 'Kill received while working the socket loop.');
 		last;
@@ -290,18 +261,7 @@ if (0 == $exitasap){
 	if ($crash_notify and ($crash_notify =~ /^(yes|true|1)$/i)){
 		# Exiting without being killed. Notify owner.
 		dolog('info', 'Notifying owner about unexpected exit.');
-		# Build the command line for and execute prowl.pl
-		my @prowl_cmd;
-		push @prowl_cmd, $prowl;
-		push @prowl_cmd, "-apikey=$prowl_key";
-		push @prowl_cmd, "-application=$prowl_app";
-		push @prowl_cmd, "-event=Unexpected Exit";
-		push @prowl_cmd, "-notification=GhettoPush for ${imap_user}\@${imap_host} exiting unexpectedly. Please check logs!";
-		push @prowl_cmd, "-priority=0";
-		system(@prowl_cmd);
-		dolog('debug', (join ' ', @prowl_cmd));
-		my $rc = $?>>8;
-		dolog('debug', "Call to prowl.pl returned exitcode: $rc");
+		notify('Unexpected Exit', "GhettoPush for ${imap_user}\@${imap_host} exiting unexpectedly. Please check logs!");
 	}else{
 		dolog('info', "Notification on crash not requested.");
 	}
@@ -309,18 +269,7 @@ if (0 == $exitasap){
 	if ($exit_notify and ($exit_notify =~ /^(yes|true|1)$/i)){
 		# Controlled exit. Notify owner.
 		dolog('info', 'Notifying owner about controlled exit.');
-		# Build the command line for and execute prowl.pl
-		my @prowl_cmd;
-		push @prowl_cmd, $prowl;
-		push @prowl_cmd, "-apikey=$prowl_key";
-		push @prowl_cmd, "-application=$prowl_app";
-		push @prowl_cmd, "-event=Killed";
-		push @prowl_cmd, "-notification=GhettoPush for ${imap_user}\@${imap_host} exiting. (Killed.)";
-		push @prowl_cmd, "-priority=0";
-		system(@prowl_cmd);
-		dolog('debug', (join ' ', @prowl_cmd));
-		my $rc = $?>>8;
-		dolog('debug', "Call to prowl.pl returned exitcode: $rc");
+		notify('Killed', "GhettoPush for ${imap_user}\@${imap_host} exiting. (Killed.)");
 	}else{
 		dolog('info', "Notification on controlled exit not requested.");
 	}
@@ -328,6 +277,37 @@ if (0 == $exitasap){
 
 dolog('info', 'Exiting.');
 exit 0;
+
+sub notify{
+	my $event = shift;
+	my $message = shift;
+	notify_by_prowl($event, $message);
+}
+
+sub notify_by_prowl{
+	my $event = shift;
+	my $message = shift;
+
+	my $ua = LWP::UserAgent->new();
+	$ua->agent("GhettoPush/0.1");
+	$ua->env_proxy();
+
+	my $url = sprintf("https://prowlapp.com/publicapi/add?apikey=%s&application=%s&event=%s&description=%s&priority=0", 
+		$prowl_key,
+		$prowl_app,
+		$event,
+		$message
+	);
+	my $request = HTTP::Request->new(GET => $url);
+	my $response = $ua->request($request);
+	if ($response->is_success){
+		dolog('debug', 'Prowl notification succeeded.');
+	}elsif ($response->code == 401){
+		dolog('debug', 'Prowl failed (incorrect API key)');
+	}else{
+		dolog('debug', 'Prowl notification failed:' . $response->content);
+	}
+}
 
 sub connect_imap{
 	# Wee need the IMAP object for IMAP transaction
