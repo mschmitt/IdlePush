@@ -1,8 +1,11 @@
-# Title that will appear in prowl events
-prowl_app = IMAP
+# Push service that will be used
+push_service = prowl
 
 # Prowl API key
 prowl_key = abcdef...
+
+# Prowl description
+prowl_app = IMAP
 
 # Alternatively, use the Pushover service:
 #
