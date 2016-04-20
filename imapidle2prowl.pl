@@ -9,6 +9,7 @@ use Fcntl qw(:flock);
 use Mail::IMAPClient 3.18;
 use MIME::EncWords qw(:all);
 use FindBin qw($Bin);
+use URI::Escape;
 
 # Config file syntax, see .cfg-example
 my $config = read_config();
@@ -110,9 +111,8 @@ unless ($ENV{'NOFORK'}){
 # Write PID to pidfile, if requested.
 if ($pidfile){
 	print $lock_fh "$$\n";
-	select($lock_fh);
-	$| = 1;
-	select(STDOUT);
+	# Flush the lockfile's filehandle, perlfaq5:
+	select((select($lock_fh), $| = 1)[0]); 
 	dolog('debug', "PID $$ written to pidfile: $pidfile");
 }
 
@@ -123,7 +123,7 @@ my $socket;
 if ($startup_notify and ($startup_notify =~ /^(yes|true|1)$/i)){
 	# Tell the owner that I'm coming up.
 	dolog('info', 'Notifying owner about startup.');
-	notify('Startup', "GhettoPush for ${imap_user}\@${imap_host} is up and running.");
+	notify('Startup', "GhettoPush for ${imap_user}\@${imap_host} is up and running.", '');
 }else{
 	dolog('info', "Notification on startup not requested.");
 }
@@ -216,7 +216,7 @@ while(0 == $exitasap){
 				# Bail out of the IDLE session and pick up the new message.
 				$imap->done($session);
 				# Retrieve and mangle new message headers.
-				my $header  = $imap->parse_headers($exists_id, 'Subject', 'From');
+				my $header  = $imap->parse_headers($exists_id, 'Subject', 'From', 'Message-ID');
 				unless ($header){
 					dolog('warning', 'Empty message details. Skipping prowl, killing IMAP session.');
 					$imap->disconnect;
@@ -224,6 +224,8 @@ while(0 == $exitasap){
 				}
 				my $subjraw = $header->{'Subject'}->[0] ? $header->{'Subject'}->[0] : '';
 				my $fromraw = $header->{'From'}->[0]    ? $header->{'From'}->[0]    : '<>';
+				my $msgid   = $header->{'Message-ID'}->[0] ? $header->{'Message-ID'}->[0] : '';
+				my $msgurl  = 'message://' . uri_escape($msgid);
 				my $subject = decode_mimewords($subjraw, Charset => 'utf-8');
 				my $from    = decode_mimewords($fromraw, Charset => 'utf-8');
 				dolog('info', "New message from $from, Subject: $subject");
@@ -233,7 +235,7 @@ while(0 == $exitasap){
 				} elsif ($config->{'subj_regex'} and ($subject =~ m/$subjregexStr/i)) {
 					die "__DONT_PROWL_SUBJ__";
 				} else {
-					notify('New Mail', "From $from, Subject: $subject") or die '__PROWL_FAIL__';
+					notify('New Mail', "From $from, Subject: $subject", $msgurl) or die '__PROWL_FAIL__';
 				}
 				# Exit loop and eval from here; let the main loop restart IDLE.
 				die "__DONE__";
@@ -277,7 +279,7 @@ if (0 == $exitasap){
 	if ($crash_notify and ($crash_notify =~ /^(yes|true|1)$/i)){
 		# Exiting without being killed. Notify owner.
 		dolog('info', 'Notifying owner about unexpected exit.');
-		notify('Unexpected Exit', "GhettoPush for ${imap_user}\@${imap_host} exiting unexpectedly. Please check logs!");
+		notify('Unexpected Exit', "GhettoPush for ${imap_user}\@${imap_host} exiting unexpectedly. Please check logs!", '');
 	}else{
 		dolog('info', "Notification on crash not requested.");
 	}
@@ -285,7 +287,7 @@ if (0 == $exitasap){
 	if ($exit_notify and ($exit_notify =~ /^(yes|true|1)$/i)){
 		# Controlled exit. Notify owner.
 		dolog('info', 'Notifying owner about controlled exit.');
-		notify('Killed', "GhettoPush for ${imap_user}\@${imap_host} exiting. (Killed.)");
+		notify('Killed', "GhettoPush for ${imap_user}\@${imap_host} exiting. (Killed.)", '');
 	}else{
 		dolog('info', "Notification on controlled exit not requested.");
 	}
@@ -297,30 +299,33 @@ exit 0;
 sub notify{
 	my $event = shift;
 	my $message = shift;
+	my $addurl = shift;
 	unless ($push_service){
 		dolog('debug', 'No push service configured. Does this make sense?');
 		return;
 	}
 	if ($push_service eq 'prowl'){
-		notify_by_prowl($event, $message);
+		notify_by_prowl($event, $message, $addurl);
 	}elsif($push_service eq 'pushover'){
-		notify_by_pushover($event, $message);
+		notify_by_pushover($event, $message, $addurl);
 	}
 }
 
 sub notify_by_prowl{
 	my $event = shift;
 	my $message = shift;
+	my $addurl = shift;
 
 	my $ua = LWP::UserAgent->new();
 	$ua->agent("GhettoPush/0.1");
 	$ua->env_proxy();
 
-	my $url = sprintf("https://prowlapp.com/publicapi/add?apikey=%s&application=%s&event=%s&description=%s&priority=0", 
+	my $url = sprintf("https://prowlapp.com/publicapi/add?apikey=%s&application=%s&event=%s&description=%s&url=%s&priority=0", 
 		$prowl_key,
 		$prowl_app,
 		$event,
-		$message
+		$message,
+		$addurl
 	);
 	my $request = HTTP::Request->new(GET => $url);
 	my $response = $ua->request($request);
@@ -336,16 +341,18 @@ sub notify_by_prowl{
 sub notify_by_pushover{
 	my $event = shift;
 	my $message = shift;
+	my $addurl = shift;
 
 	my $ua = LWP::UserAgent->new();
 	$ua->agent("GhettoPush/0.1");
 	$ua->env_proxy();
 
-	my $url = sprintf("https://api.pushover.net/1/messages.json?user=%s&token=%s&title=%s&message=%s&priority=0&url=mailto:",
+	my $url = sprintf("https://api.pushover.net/1/messages.json?user=%s&token=%s&title=%s&message=%s&priority=0&url=%s",
 		$pushover_user,
 		$pushover_app,
 		$event,
-		$message
+		$message,
+		$addurl
 	);
 	dolog('debug', 'URL is: ' . $url);
 	my $request = HTTP::Request->new(POST => $url);
