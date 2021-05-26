@@ -1,9 +1,12 @@
-GhettoPush
+IdlePush
 ==========
+
+*** Note this project, although hardly in use by anyone anymore, was renamed
+*** from GhettoPush to IdlePush in 2021.
 
 A Perl implementation of IMAP push for the iPhone with generic IMAP servers.
 
-http://github.com/mschmitt/GhettoPush
+http://github.com/mschmitt/IdlePush
 
 Requires
 --------

@@ -123,7 +123,7 @@ my $socket;
 if ($startup_notify and ($startup_notify =~ /^(yes|true|1)$/i)){
 	# Tell the owner that I'm coming up.
 	dolog('info', 'Notifying owner about startup.');
-	notify('Startup', "GhettoPush for ${imap_user}\@${imap_host} is up and running.", '');
+	notify('Startup', "IdlePush for ${imap_user}\@${imap_host} is up and running.", '');
 }else{
 	dolog('info', "Notification on startup not requested.");
 }
@@ -235,7 +235,7 @@ while(0 == $exitasap){
 				} elsif ($config->{'subj_regex'} and ($subject =~ m/$subjregexStr/i)) {
 					die "__DONT_PROWL_SUBJ__";
 				} else {
-					notify('New Mail', "From $from, Subject: $subject", $msgurl) or die '__PROWL_FAIL__';
+					notify($from, $subject, $msgurl) or die '__PROWL_FAIL__';
 				}
 				# Exit loop and eval from here; let the main loop restart IDLE.
 				die "__DONE__";
@@ -279,7 +279,7 @@ if (0 == $exitasap){
 	if ($crash_notify and ($crash_notify =~ /^(yes|true|1)$/i)){
 		# Exiting without being killed. Notify owner.
 		dolog('info', 'Notifying owner about unexpected exit.');
-		notify('Unexpected Exit', "GhettoPush for ${imap_user}\@${imap_host} exiting unexpectedly. Please check logs!", '');
+		notify('Unexpected Exit', "IdlePush for ${imap_user}\@${imap_host} exiting unexpectedly. Please check logs!", '');
 	}else{
 		dolog('info', "Notification on crash not requested.");
 	}
@@ -287,7 +287,7 @@ if (0 == $exitasap){
 	if ($exit_notify and ($exit_notify =~ /^(yes|true|1)$/i)){
 		# Controlled exit. Notify owner.
 		dolog('info', 'Notifying owner about controlled exit.');
-		notify('Killed', "GhettoPush for ${imap_user}\@${imap_host} exiting. (Killed.)", '');
+		notify('Killed', "IdlePush for ${imap_user}\@${imap_host} exiting. (Killed.)", '');
 	}else{
 		dolog('info', "Notification on controlled exit not requested.");
 	}
@@ -317,7 +317,7 @@ sub notify_by_prowl{
 	my $addurl = shift;
 
 	my $ua = LWP::UserAgent->new();
-	$ua->agent("GhettoPush/0.1");
+	$ua->agent("IdlePush/0.1");
 	$ua->env_proxy();
 
 	my $url = sprintf("https://prowlapp.com/publicapi/add?apikey=%s&application=%s&event=%s&description=%s&url=%s&priority=0", 
@@ -344,7 +344,7 @@ sub notify_by_pushover{
 	my $addurl = shift;
 
 	my $ua = LWP::UserAgent->new();
-	$ua->agent("GhettoPush/0.1");
+	$ua->agent("IdlePush/0.1");
 	$ua->env_proxy();
 
 	my $url = sprintf("https://api.pushover.net/1/messages.json?user=%s&token=%s&title=%s&message=%s&priority=0&url=%s",
@@ -452,7 +452,7 @@ sub dolog {
 	if ($logfile){
 		if ($logfile =~ /^syslog:(.+)$/){
 			# Syslog here
-			my $tag = "GhettoPush/$1";
+			my $tag = "IdlePush/$1";
 			my $facility = 'mail';
 			openlog($tag, 'pid', $facility);
 			syslog($lvl, $msg);
